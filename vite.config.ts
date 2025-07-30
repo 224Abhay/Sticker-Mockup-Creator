@@ -4,7 +4,7 @@ import path from "path";
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
-  base: mode === 'production' ? '/sticker-mockup-creator/' : '/',
+  base: mode === 'production' ? '/Sticker-Mockup-Creator/' : '/',
   server: {
     host: "::",
     port: 8080,

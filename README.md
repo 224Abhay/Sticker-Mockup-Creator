@@ -2,7 +2,7 @@
 
 A powerful web application for creating professional sticker mockups with customizable measurement lines and precise positioning.
 
-🌐 **[Live Demo](https://224abhay.github.io/sticker-mockup-creator/)** - Try it out now!
+🌐 **[Live Demo](https://224abhay.github.io/Sticker-Mockup-Creator/)** - Try it out now!
 
 ![Sticker Mockup Creator](https://img.shields.io/badge/React-18.0-blue?style=for-the-badge&logo=react)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue?style=for-the-badge&logo=typescript)
