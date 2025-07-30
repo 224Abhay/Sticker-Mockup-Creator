@@ -52,6 +52,7 @@ A powerful web application for creating professional sticker mockups with custom
 - Descriptive filenames: `{sticker_name}-{background_name}-{size}.png`
 - High-quality PNG output
 - Automatic download of all generated mockups
+- Zip download option
 
 ## 🚀 Getting Started
 
@@ -132,6 +133,7 @@ If you want to deploy manually:
    - Review the total number of mockups to be generated
    - Click "Generate Mockups" to create all combinations
    - Files are automatically downloaded with descriptive names
+   - Files can be downloaded in a zip
 
 ## 🎨 Customization
 
