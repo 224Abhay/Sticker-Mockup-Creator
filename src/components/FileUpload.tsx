@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { Upload, X } from "lucide-react";
 import { Button } from "./ui/button";
 
@@ -22,6 +22,7 @@ export const FileUpload = ({
   multiple = false
 }: FileUploadProps) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isDragOver, setIsDragOver] = useState(false);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -39,6 +40,44 @@ export const FileUpload = ({
 
   const handleClick = () => {
     fileInputRef.current?.click();
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    
+    const files = Array.from(e.dataTransfer.files);
+    const acceptedFiles = files.filter(file => {
+      const fileType = file.type;
+      const acceptedTypes = accept.split(',').map(type => type.trim());
+      return acceptedTypes.some(type => {
+        if (type.startsWith('.')) {
+          // File extension
+          return file.name.toLowerCase().endsWith(type.toLowerCase());
+        } else {
+          // MIME type
+          return fileType === type || fileType.startsWith(type.replace('*', ''));
+        }
+      });
+    });
+
+    if (acceptedFiles.length > 0) {
+      if (multiple) {
+        onFileSelect(acceptedFiles);
+      } else {
+        onFileSelect([acceptedFiles[0]]);
+      }
+    }
   };
 
   if (hasFile && preview) {
@@ -68,10 +107,23 @@ export const FileUpload = ({
   return (
     <div 
       onClick={handleClick}
-      className="w-full h-32 border-2 border-dashed border-border hover:border-primary bg-muted/50 hover:bg-muted rounded-lg flex flex-col items-center justify-center cursor-pointer transition-colors"
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+      className={`w-full h-32 border-2 border-dashed transition-colors flex flex-col items-center justify-center cursor-pointer ${
+        isDragOver 
+          ? 'border-primary bg-primary/10' 
+          : 'border-border hover:border-primary bg-muted/50 hover:bg-muted'
+      } rounded-lg`}
     >
-      <Upload className="h-6 w-6 text-muted-foreground mb-2" />
-      <p className="text-sm text-muted-foreground text-center">{placeholder}</p>
+      <Upload className={`h-6 w-6 mb-2 transition-colors ${
+        isDragOver ? 'text-primary' : 'text-muted-foreground'
+      }`} />
+      <p className={`text-sm text-center transition-colors ${
+        isDragOver ? 'text-primary' : 'text-muted-foreground'
+      }`}>
+        {isDragOver ? 'Drop files here' : placeholder}
+      </p>
       <input
         ref={fileInputRef}
         type="file"

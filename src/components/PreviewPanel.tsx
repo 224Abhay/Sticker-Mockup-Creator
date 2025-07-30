@@ -1,4 +1,8 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
+import { Label } from "@/components/ui/label";
+import { Slider } from "@/components/ui/slider";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 
 interface BackgroundFile {
   file: File;
@@ -10,18 +14,25 @@ interface PreviewPanelProps {
   currentPosition: { x: number; y: number; width: number; height: number };
   onStickerPositionChange: (position: { x: number; y: number; width: number; height: number }) => void;
   onPreviewDimensionsChange: (dimensions: { width: number; height: number }) => void;
+  onMeasurementLineToggle?: (show: boolean) => void;
+  onMeasurementSettingsChange?: (settings: {
+    lineWidth: number;
+    fontSize: number;
+    distance: number;
+    color: string;
+    endStyle: 'perpendicular' | 'arrow';
+  }) => void;
   measurementSettings?: {
     showMeasurementLine: boolean;
     lineWidth: number;
     fontSize: number;
     distance: number;
     color: string;
-    lineLength: number;
     endStyle: 'perpendicular' | 'arrow';
   };
 }
 
-export const PreviewPanel = ({ currentBackground, currentPosition, onStickerPositionChange, onPreviewDimensionsChange, measurementSettings }: PreviewPanelProps) => {
+export const PreviewPanel = ({ currentBackground, currentPosition, onStickerPositionChange, onPreviewDimensionsChange, onMeasurementLineToggle, onMeasurementSettingsChange, measurementSettings }: PreviewPanelProps) => {
   const [stickerBox, setStickerBox] = useState(currentPosition);
   const [isDragging, setIsDragging] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
@@ -146,190 +157,177 @@ export const PreviewPanel = ({ currentBackground, currentPosition, onStickerPosi
           >
             {(() => {
               const isWider = stickerBox.width > stickerBox.height;
-              const lineLength = measurementSettings.lineLength / 100;
+              // Calculate line length based on end style (100% for perpendicular, 95% for arrow)
+              const lineLength = (measurementSettings.endStyle === 'arrow' ? 90 : 100) / 100;
               
-              // Scale factors to match the final mockup output
-              // Get actual preview container dimensions
-              const previewContainer = previewRef.current;
-              const previewWidth = previewContainer ? previewContainer.offsetWidth : 400;
-              const previewHeight = previewContainer ? previewContainer.offsetHeight : 256;
+              // Calculate absolute values based on sticker box size in preview
+              // This matches the same calculation used in the final mockup generation
+              const absoluteLineWidth = Math.max(1, (stickerBox.width * measurementSettings.lineWidth) / 100);
+              const absoluteFontSize = Math.max(8, (stickerBox.height * measurementSettings.fontSize) / 100);
+              const absoluteDistance = (stickerBox.width * measurementSettings.distance) / 100;
+              const absoluteEndSize = Math.max(5, (stickerBox.width * 2) / 100); // 2% of sticker width for end elements
               
-              // Calculate scale based on actual container size
-              const scaleX = stickerBox.width / previewWidth;
-              const scaleY = stickerBox.height / previewHeight;
-              const baseScale = Math.min(scaleX, scaleY);
-              
-              // Apply additional scaling factor to account for higher resolution in final output
-              // This makes preview elements smaller to match the relative size in final mockups
-              const scale = baseScale; // Reduce by 80% to account for resolution difference
-              
-              // Scale the measurement settings to match preview size
-              const scaledLineWidth = Math.max(1, measurementSettings.lineWidth * scale);
-              const scaledFontSize = Math.max(8, measurementSettings.fontSize * scale);
-              const scaledDistance = measurementSettings.distance * scale;
-              const scaledEndSize = 20 * scale; // Size of perpendicular lines and arrow heads
-              
-                              if (isWider) {
-                  // Horizontal measurement line
-                  const lineY = stickerBox.y + stickerBox.height + scaledDistance;
-                  const totalLength = stickerBox.width * lineLength;
-                  const lineX1 = stickerBox.x + (stickerBox.width - totalLength) / 2;
-                  const lineX2 = lineX1 + totalLength;
-                  const centerX = (lineX1 + lineX2) / 2;
-                  const textWidth = scaledFontSize * 0.7; // Approximate text width based on font size
-                  const gapSize = textWidth + 20;
+              if (isWider) {
+                // Horizontal measurement line
+                const lineY = stickerBox.y + stickerBox.height + absoluteDistance;
+                const totalLength = stickerBox.width * lineLength;
+                const lineX1 = stickerBox.x + (stickerBox.width - totalLength) / 2;
+                const lineX2 = lineX1 + totalLength;
+                const centerX = (lineX1 + lineX2) / 2;
+                const textWidth = absoluteFontSize * 0.7; // Approximate text width based on font size
+                const gapSize = textWidth + (absoluteFontSize * 2); // Scale gap with font size
                 
                 return (
                   <>
-                                         {/* Left line segment */}
-                     <line
-                       x1={lineX1}
-                       y1={lineY}
-                       x2={centerX - gapSize / 2}
-                       y2={lineY}
-                       stroke={measurementSettings.color}
-                       strokeWidth={scaledLineWidth}
-                     />
-                     
-                     {/* Right line segment */}
-                     <line
-                       x1={centerX + gapSize / 2}
-                       y1={lineY}
-                       x2={lineX2}
-                       y2={lineY}
-                       stroke={measurementSettings.color}
-                       strokeWidth={scaledLineWidth}
-                     />
+                    {/* Left line segment */}
+                    <line
+                      x1={lineX1}
+                      y1={lineY}
+                      x2={centerX - gapSize / 2}
+                      y2={lineY}
+                      stroke={measurementSettings.color}
+                      strokeWidth={absoluteLineWidth}
+                    />
                     
-                                         {/* Left end */}
-                     {measurementSettings.endStyle === 'perpendicular' ? (
-                       <line
-                         x1={lineX1}
-                         y1={lineY - scaledEndSize}
-                         x2={lineX1}
-                         y2={lineY + scaledEndSize}
-                         stroke={measurementSettings.color}
-                         strokeWidth={scaledLineWidth}
-                       />
-                     ) : (
-                       <polygon
-                         points={`${lineX1 - scaledEndSize * 1.25},${lineY} ${lineX1},${lineY - scaledEndSize} ${lineX1},${lineY + scaledEndSize}`}
-                         fill={measurementSettings.color}
-                       />
-                     )}
-                     
-                     {/* Right end */}
-                     {measurementSettings.endStyle === 'perpendicular' ? (
-                       <line
-                         x1={lineX2}
-                         y1={lineY - scaledEndSize}
-                         x2={lineX2}
-                         y2={lineY + scaledEndSize}
-                         stroke={measurementSettings.color}
-                         strokeWidth={scaledLineWidth}
-                       />
-                     ) : (
-                       <polygon
-                         points={`${lineX2 + scaledEndSize * 1.25},${lineY} ${lineX2},${lineY - scaledEndSize} ${lineX2},${lineY + scaledEndSize}`}
-                         fill={measurementSettings.color}
-                       />
-                     )}
+                    {/* Right line segment */}
+                    <line
+                      x1={centerX + gapSize / 2}
+                      y1={lineY}
+                      x2={lineX2}
+                      y2={lineY}
+                      stroke={measurementSettings.color}
+                      strokeWidth={absoluteLineWidth}
+                    />
                     
-                                         {/* Size text */}
-                     <text
-                       x={centerX}
-                       y={lineY}
-                       textAnchor="middle"
-                       dominantBaseline="middle"
-                       fill={measurementSettings.color}
-                       fontSize={scaledFontSize}
-                       fontFamily="Open Sans"
-                       fontWeight="bold"
-                     >
-                       {scaledFontSize > 20 ? '4cm' : '4cm'}
-                     </text>
+                    {/* Left end */}
+                    {measurementSettings.endStyle === 'perpendicular' ? (
+                      <line
+                        x1={lineX1}
+                        y1={lineY - absoluteEndSize}
+                        x2={lineX1}
+                        y2={lineY + absoluteEndSize}
+                        stroke={measurementSettings.color}
+                        strokeWidth={absoluteLineWidth}
+                      />
+                    ) : (
+                      <polygon
+                        points={`${lineX1 - absoluteEndSize * 1.25},${lineY} ${lineX1},${lineY - absoluteEndSize} ${lineX1},${lineY + absoluteEndSize}`}
+                        fill={measurementSettings.color}
+                      />
+                    )}
+                    
+                    {/* Right end */}
+                    {measurementSettings.endStyle === 'perpendicular' ? (
+                      <line
+                        x1={lineX2}
+                        y1={lineY - absoluteEndSize}
+                        x2={lineX2}
+                        y2={lineY + absoluteEndSize}
+                        stroke={measurementSettings.color}
+                        strokeWidth={absoluteLineWidth}
+                      />
+                    ) : (
+                      <polygon
+                        points={`${lineX2 + absoluteEndSize * 1.25},${lineY} ${lineX2},${lineY - absoluteEndSize} ${lineX2},${lineY + absoluteEndSize}`}
+                        fill={measurementSettings.color}
+                      />
+                    )}
+                    
+                    {/* Size text */}
+                    <text
+                      x={centerX}
+                      y={lineY}
+                      textAnchor="middle"
+                      dominantBaseline="middle"
+                      fill={measurementSettings.color}
+                      fontSize={absoluteFontSize}
+                      fontFamily="Open Sans"
+                      fontWeight="bold"
+                    >
+                      {absoluteFontSize > 20 ? '4cm' : '4cm'}
+                    </text>
                   </>
                 );
-                             } else {
-                 // Vertical measurement line
-                 const lineX = stickerBox.x + stickerBox.width + scaledDistance;
-                 const totalLength = stickerBox.height * lineLength;
-                 const lineY1 = stickerBox.y + (stickerBox.height - totalLength) / 2;
-                 const lineY2 = lineY1 + totalLength;
-                 const centerY = (lineY1 + lineY2) / 2;
-                 const textHeight = scaledFontSize;
-                 const gapSize = textHeight + 20;
+              } else {
+                // Vertical measurement line
+                const lineX = stickerBox.x + stickerBox.width + absoluteDistance;
+                const totalLength = stickerBox.height * lineLength;
+                const lineY1 = stickerBox.y + (stickerBox.height - totalLength) / 2;
+                const lineY2 = lineY1 + totalLength;
+                const centerY = (lineY1 + lineY2) / 2;
+                const textHeight = absoluteFontSize;
+                const gapSize = textHeight + (absoluteFontSize * 2);
                 
                 return (
                   <>
-                                         {/* Top line segment */}
-                     <line
-                       x1={lineX}
-                       y1={lineY1}
-                       x2={lineX}
-                       y2={centerY - gapSize / 2}
-                       stroke={measurementSettings.color}
-                       strokeWidth={scaledLineWidth}
-                     />
-                     
-                     {/* Bottom line segment */}
-                     <line
-                       x1={lineX}
-                       y1={centerY + gapSize / 2}
-                       x2={lineX}
-                       y2={lineY2}
-                       stroke={measurementSettings.color}
-                       strokeWidth={scaledLineWidth}
-                     />
+                    {/* Top line segment */}
+                    <line
+                      x1={lineX}
+                      y1={lineY1}
+                      x2={lineX}
+                      y2={centerY - gapSize / 2}
+                      stroke={measurementSettings.color}
+                      strokeWidth={absoluteLineWidth}
+                    />
                     
-                                         {/* Top end */}
-                     {measurementSettings.endStyle === 'perpendicular' ? (
-                       <line
-                         x1={lineX - scaledEndSize}
-                         y1={lineY1}
-                         x2={lineX + scaledEndSize}
-                         y2={lineY1}
-                         stroke={measurementSettings.color}
-                         strokeWidth={scaledLineWidth}
-                       />
-                     ) : (
-                       <polygon
-                         points={`${lineX},${lineY1 - scaledEndSize * 1.25} ${lineX - scaledEndSize},${lineY1} ${lineX + scaledEndSize},${lineY1}`}
-                         fill={measurementSettings.color}
-                       />
-                     )}
-                     
-                     {/* Bottom end */}
-                     {measurementSettings.endStyle === 'perpendicular' ? (
-                       <line
-                         x1={lineX - scaledEndSize}
-                         y1={lineY2}
-                         x2={lineX + scaledEndSize}
-                         y2={lineY2}
-                         stroke={measurementSettings.color}
-                         strokeWidth={scaledLineWidth}
-                       />
-                     ) : (
-                       <polygon
-                         points={`${lineX},${lineY2 + scaledEndSize * 1.25} ${lineX - scaledEndSize},${lineY2} ${lineX + scaledEndSize},${lineY2}`}
-                         fill={measurementSettings.color}
-                       />
-                     )}
+                    {/* Bottom line segment */}
+                    <line
+                      x1={lineX}
+                      y1={centerY + gapSize / 2}
+                      x2={lineX}
+                      y2={lineY2}
+                      stroke={measurementSettings.color}
+                      strokeWidth={absoluteLineWidth}
+                    />
                     
-                                         {/* Size text (rotated) */}
-                     <text
-                       x={lineX}
-                       y={centerY}
-                       textAnchor="middle"
-                       dominantBaseline="middle"
-                       fill={measurementSettings.color}
-                       fontSize={scaledFontSize}
-                       fontFamily="Open Sans"
-                       fontWeight="bold"
-                       transform={`rotate(-90 ${lineX} ${centerY})`}
-                     >
-                       {scaledFontSize > 20 ? '4cm' : '4cm'}
-                     </text>
+                    {/* Top end */}
+                    {measurementSettings.endStyle === 'perpendicular' ? (
+                      <line
+                        x1={lineX - absoluteEndSize}
+                        y1={lineY1}
+                        x2={lineX + absoluteEndSize}
+                        y2={lineY1}
+                        stroke={measurementSettings.color}
+                        strokeWidth={absoluteLineWidth}
+                      />
+                    ) : (
+                      <polygon
+                        points={`${lineX},${lineY1 - absoluteEndSize * 1.25} ${lineX - absoluteEndSize},${lineY1} ${lineX + absoluteEndSize},${lineY1}`}
+                        fill={measurementSettings.color}
+                      />
+                    )}
+                    
+                    {/* Bottom end */}
+                    {measurementSettings.endStyle === 'perpendicular' ? (
+                      <line
+                        x1={lineX - absoluteEndSize}
+                        y1={lineY2}
+                        x2={lineX + absoluteEndSize}
+                        y2={lineY2}
+                        stroke={measurementSettings.color}
+                        strokeWidth={absoluteLineWidth}
+                      />
+                    ) : (
+                      <polygon
+                        points={`${lineX},${lineY2 + absoluteEndSize * 1.25} ${lineX - absoluteEndSize},${lineY2} ${lineX + absoluteEndSize},${lineY2}`}
+                        fill={measurementSettings.color}
+                      />
+                    )}
+                    
+                    {/* Size text (rotated) */}
+                    <text
+                      x={lineX}
+                      y={centerY}
+                      textAnchor="middle"
+                      dominantBaseline="middle"
+                      fill={measurementSettings.color}
+                      fontSize={absoluteFontSize}
+                      fontFamily="Open Sans"
+                      fontWeight="bold"
+                      transform={`rotate(-90 ${lineX} ${centerY})`}
+                    >
+                      {absoluteFontSize > 20 ? '4cm' : '4cm'}
+                    </text>
                   </>
                 );
               }
@@ -337,35 +335,134 @@ export const PreviewPanel = ({ currentBackground, currentPosition, onStickerPosi
           </svg>
         )}
       </div>
-      <div className="space-y-2">
-        <p className="text-xs text-muted-foreground">
-          Drag to move, resize from bottom-right corner
-        </p>
-        
-        {/* Position and size details */}
-        <div className="grid grid-cols-2 gap-4 text-xs">
-          <div className="space-y-1">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">X Position:</span>
-              <span className="font-mono font-medium">{Math.round(stickerBox.x)}px</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Y Position:</span>
-              <span className="font-mono font-medium">{Math.round(stickerBox.y)}px</span>
-            </div>
+              <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <Label htmlFor="measurement-line" className="text-sm font-medium">
+              Show Measurement Line
+            </Label>
+            <Switch
+              id="measurement-line"
+              checked={measurementSettings?.showMeasurementLine || false}
+              onCheckedChange={(checked) => onMeasurementLineToggle?.(checked)}
+            />
           </div>
-          <div className="space-y-1">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Width:</span>
-              <span className="font-mono font-medium">{Math.round(stickerBox.width)}px</span>
+          
+          {measurementSettings?.showMeasurementLine && (
+            <div className="space-y-4 pl-4 border-l-2 border-border">
+              <div className="space-y-2">
+                <Label className="text-xs text-muted-foreground">
+                  Line Width: {measurementSettings.lineWidth}% of sticker width
+                </Label>
+                <Slider
+                  value={[measurementSettings.lineWidth]}
+                  onValueChange={(value) => onMeasurementSettingsChange?.({
+                    lineWidth: value[0],
+                    fontSize: measurementSettings.fontSize,
+                    distance: measurementSettings.distance,
+                    color: measurementSettings.color,
+                    endStyle: measurementSettings.endStyle
+                  })}
+                  min={0.5}
+                  max={2}
+                  step={0.1}
+                  className="w-full"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label className="text-xs text-muted-foreground">
+                  Font Size: {measurementSettings.fontSize}% of sticker height
+                </Label>
+                <Slider
+                  value={[measurementSettings.fontSize]}
+                  onValueChange={(value) => onMeasurementSettingsChange?.({
+                    lineWidth: measurementSettings.lineWidth,
+                    fontSize: value[0],
+                    distance: measurementSettings.distance,
+                    color: measurementSettings.color,
+                    endStyle: measurementSettings.endStyle
+                  })}
+                  min={2}
+                  max={20}
+                  step={0.5}
+                  className="w-full"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label className="text-xs text-muted-foreground">
+                  Distance: {measurementSettings.distance}% of sticker width
+                </Label>
+                <Slider
+                  value={[measurementSettings.distance]}
+                  onValueChange={(value) => onMeasurementSettingsChange?.({
+                    lineWidth: measurementSettings.lineWidth,
+                    fontSize: measurementSettings.fontSize,
+                    distance: value[0],
+                    color: measurementSettings.color,
+                    endStyle: measurementSettings.endStyle
+                  })}
+                  min={5}
+                  max={30}
+                  step={0.5}
+                  className="w-full"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="end-style" className="text-xs text-muted-foreground">
+                  End Style
+                </Label>
+                <Select
+                  value={measurementSettings.endStyle}
+                  onValueChange={(value: 'perpendicular' | 'arrow') => onMeasurementSettingsChange?.({
+                    lineWidth: measurementSettings.lineWidth,
+                    fontSize: measurementSettings.fontSize,
+                    distance: measurementSettings.distance,
+                    color: measurementSettings.color,
+                    endStyle: value
+                  })}
+                >
+                  <SelectTrigger className="h-8">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="perpendicular">Perpendicular Line</SelectItem>
+                    <SelectItem value="arrow">Arrow Head</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="color" className="text-xs text-muted-foreground">
+                  Color
+                </Label>
+                <Select
+                  value={measurementSettings.color}
+                  onValueChange={(value) => onMeasurementSettingsChange?.({
+                    lineWidth: measurementSettings.lineWidth,
+                    fontSize: measurementSettings.fontSize,
+                    distance: measurementSettings.distance,
+                    color: value,
+                    endStyle: measurementSettings.endStyle
+                  })}
+                >
+                  <SelectTrigger className="h-8">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="#FFFFFF">White</SelectItem>
+                    <SelectItem value="#000000">Black</SelectItem>
+                    <SelectItem value="#FF0000">Red</SelectItem>
+                    <SelectItem value="#00FF00">Green</SelectItem>
+                    <SelectItem value="#0000FF">Blue</SelectItem>
+                    <SelectItem value="#FFFF00">Yellow</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Height:</span>
-              <span className="font-mono font-medium">{Math.round(stickerBox.height)}px</span>
-            </div>
-          </div>
+          )}
         </div>
-      </div>
     </div>
   );
 };

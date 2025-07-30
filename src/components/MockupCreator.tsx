@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Download } from "lucide-react";
+import { Download, X, Archive } from "lucide-react";
+import JSZip from "jszip";
 import { Button } from "./ui/button";
 import { Switch } from "./ui/switch";
 import { Label } from "./ui/label";
@@ -39,22 +40,23 @@ export const MockupCreator = () => {
     large: { width: 400, height: 256 }
   });
   const [isGenerating, setIsGenerating] = useState(false);
+  const [generationProgress, setGenerationProgress] = useState({ current: 0, total: 0 });
+  const [cancelGeneration, setCancelGeneration] = useState(false);
+  const [downloadAsZip, setDownloadAsZip] = useState(false);
   
-  // Measurement line settings
+  // Measurement line settings - now using relative values
   const [showMeasurementLine, setShowMeasurementLine] = useState(true);
   const [measurementSettings, setMeasurementSettings] = useState<{
-    lineWidth: number;
-    fontSize: number;
-    distance: number;
+    lineWidth: number; // Percentage of sticker width
+    fontSize: number; // Percentage of sticker height
+    distance: number; // Percentage of sticker width
     color: string;
-    lineLength: number;
     endStyle: 'perpendicular' | 'arrow';
   }>({
-    lineWidth: 16,
-    fontSize: 86,
-    distance: 80,
+    lineWidth: 2, // 2% of sticker width
+    fontSize: 8, // 8% of sticker height
+    distance: 10, // 10% of sticker width
     color: '#FFFFFF',
-    lineLength: 100, // Percentage of box length
     endStyle: 'perpendicular'
   });
 
@@ -167,6 +169,9 @@ export const MockupCreator = () => {
     }
 
     setIsGenerating(true);
+    setCancelGeneration(false);
+    const totalMockups = backgroundList.length * stickers.length;
+    setGenerationProgress({ current: 0, total: totalMockups });
     toast.info("Generating mockups...");
 
     try {
@@ -175,9 +180,18 @@ export const MockupCreator = () => {
       if (!ctx) throw new Error('Canvas context not available');
 
       const mockups: { blob: Blob; filename: string }[] = [];
+      let currentProgress = 0;
 
       for (const background of backgroundList) {
         for (const sticker of stickers) {
+          // Check for cancellation
+          if (cancelGeneration) {
+            toast.info("Generation cancelled");
+            return;
+          }
+
+          currentProgress++;
+          setGenerationProgress({ current: currentProgress, total: totalMockups });
           // Create background image
           const bgImg = new Image();
           bgImg.src = background.preview;
@@ -250,36 +264,45 @@ export const MockupCreator = () => {
             const sizeText = backgroundSize === 'small' ? '4cm' : backgroundSize === 'medium' ? '6cm' : '10cm';
             const isWider = stickerW > stickerH;
             
+            // Calculate line length based on end style (100% for perpendicular, 95% for arrow)
+            const lineLength = measurementSettings.endStyle === 'arrow' ? 90 : 100;
+            
+            // Calculate absolute values based on sticker size
+            const absoluteLineWidth = Math.max(1, (stickerW * measurementSettings.lineWidth) / 100);
+            const absoluteFontSize = Math.max(8, (stickerH * measurementSettings.fontSize) / 100);
+            const absoluteDistance = (stickerW * measurementSettings.distance) / 100;
+            const absoluteEndSize = Math.max(5, (stickerW * 2) / 100); // 2% of sticker width for end elements
+            
             // Set line styling
             ctx.strokeStyle = measurementSettings.color;
-            ctx.lineWidth = measurementSettings.lineWidth;
+            ctx.lineWidth = absoluteLineWidth;
             ctx.fillStyle = measurementSettings.color;
-            ctx.font = `bold ${measurementSettings.fontSize}px "Open Sans"`;
+            ctx.font = `bold ${absoluteFontSize}px "Open Sans"`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
           
           if (isWider) {
             // Horizontal line (width is bigger)
-            const lineY = finalStickerY + stickerH + measurementSettings.distance;
-            const totalLength = stickerW * (measurementSettings.lineLength / 100);
+            const lineY = finalStickerY + stickerH + absoluteDistance;
+            const totalLength = stickerW * (lineLength / 100);
             const lineX1 = finalStickerX + (stickerW - totalLength) / 2;
             const lineX2 = lineX1 + totalLength;
             const centerX = (lineX1 + lineX2) / 2;
             const textWidth = ctx.measureText(sizeText).width;
-            const gapSize = textWidth + 60; // Extra padding around text
+            const gapSize = textWidth + (absoluteFontSize * 2); // Scale gap with font size
             
             // Draw left end
             if (measurementSettings.endStyle === 'perpendicular') {
               ctx.beginPath();
-              ctx.moveTo(lineX1, lineY - 20);
-              ctx.lineTo(lineX1, lineY + 20);
+              ctx.moveTo(lineX1, lineY - absoluteEndSize);
+              ctx.lineTo(lineX1, lineY + absoluteEndSize);
               ctx.stroke();
             } else {
               // Arrow head
               ctx.beginPath();
-              ctx.moveTo(lineX1 - 25, lineY);
-              ctx.lineTo(lineX1, lineY - 20);
-              ctx.lineTo(lineX1, lineY + 20);
+              ctx.moveTo(lineX1 - absoluteEndSize * 1.25, lineY);
+              ctx.lineTo(lineX1, lineY - absoluteEndSize);
+              ctx.lineTo(lineX1, lineY + absoluteEndSize);
               ctx.closePath();
               ctx.fill();
             }
@@ -293,15 +316,15 @@ export const MockupCreator = () => {
             // Draw right end
             if (measurementSettings.endStyle === 'perpendicular') {
               ctx.beginPath();
-              ctx.moveTo(lineX2, lineY - 20);
-              ctx.lineTo(lineX2, lineY + 20);
+              ctx.moveTo(lineX2, lineY - absoluteEndSize);
+              ctx.lineTo(lineX2, lineY + absoluteEndSize);
               ctx.stroke();
             } else {
               // Arrow head
               ctx.beginPath();
-              ctx.moveTo(lineX2 + 25, lineY);
-              ctx.lineTo(lineX2, lineY - 20);
-              ctx.lineTo(lineX2, lineY + 20);
+              ctx.moveTo(lineX2 + absoluteEndSize * 1.25, lineY);
+              ctx.lineTo(lineX2, lineY - absoluteEndSize);
+              ctx.lineTo(lineX2, lineY + absoluteEndSize);
               ctx.closePath();
               ctx.fill();
             }
@@ -317,26 +340,26 @@ export const MockupCreator = () => {
             
           } else {
             // Vertical line (height is bigger)
-            const lineX = finalStickerX + stickerW + measurementSettings.distance;
-            const totalLength = stickerH * (measurementSettings.lineLength / 100);
+            const lineX = finalStickerX + stickerW + absoluteDistance;
+            const totalLength = stickerH * (lineLength / 100);
             const lineY1 = finalStickerY + (stickerH - totalLength) / 2;
             const lineY2 = lineY1 + totalLength;
             const centerY = (lineY1 + lineY2) / 2;
-            const textHeight = measurementSettings.fontSize; // Approximate text height
-            const gapSize = textHeight + 60; // Extra padding around text
+            const textHeight = absoluteFontSize; // Use calculated font size
+            const gapSize = textHeight + (absoluteFontSize * 2); // Scale gap with font size
             
             // Draw top end
             if (measurementSettings.endStyle === 'perpendicular') {
               ctx.beginPath();
-              ctx.moveTo(lineX - 20, lineY1);
-              ctx.lineTo(lineX + 20, lineY1);
+              ctx.moveTo(lineX - absoluteEndSize, lineY1);
+              ctx.lineTo(lineX + absoluteEndSize, lineY1);
               ctx.stroke();
             } else {
               // Arrow head
               ctx.beginPath();
-              ctx.moveTo(lineX, lineY1 - 25);
-              ctx.lineTo(lineX - 20, lineY1);
-              ctx.lineTo(lineX + 20, lineY1);
+              ctx.moveTo(lineX, lineY1 - absoluteEndSize * 1.25);
+              ctx.lineTo(lineX - absoluteEndSize, lineY1);
+              ctx.lineTo(lineX + absoluteEndSize, lineY1);
               ctx.closePath();
               ctx.fill();
             }
@@ -350,15 +373,15 @@ export const MockupCreator = () => {
             // Draw bottom end
             if (measurementSettings.endStyle === 'perpendicular') {
               ctx.beginPath();
-              ctx.moveTo(lineX - 20, lineY2);
-              ctx.lineTo(lineX + 20, lineY2);
+              ctx.moveTo(lineX - absoluteEndSize, lineY2);
+              ctx.lineTo(lineX + absoluteEndSize, lineY2);
               ctx.stroke();
             } else {
               // Arrow head
               ctx.beginPath();
-              ctx.moveTo(lineX, lineY2 + 25);
-              ctx.lineTo(lineX - 20, lineY2);
-              ctx.lineTo(lineX + 20, lineY2);
+              ctx.moveTo(lineX, lineY2 + absoluteEndSize * 1.25);
+              ctx.lineTo(lineX - absoluteEndSize, lineY2);
+              ctx.lineTo(lineX + absoluteEndSize, lineY2);
               ctx.closePath();
               ctx.fill();
             }
@@ -392,19 +415,43 @@ export const MockupCreator = () => {
         }
       }
 
-      // Download all mockups
-      mockups.forEach((mockup) => {
-        const url = URL.createObjectURL(mockup.blob);
+      // Download mockups
+      if (downloadAsZip) {
+        // Create zip file
+        const zip = new JSZip();
+        
+        // Add all mockups to zip
+        mockups.forEach((mockup) => {
+          zip.file(mockup.filename, mockup.blob);
+        });
+        
+        // Generate and download zip
+        const zipBlob = await zip.generateAsync({ type: "blob" });
+        const url = URL.createObjectURL(zipBlob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = mockup.filename;
+        a.download = `sticker-mockups-${new Date().toISOString().split('T')[0]}.zip`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
-      });
-
-      toast.success(`Generated ${mockups.length} mockups successfully!`);
+        
+        toast.success(`Generated ${mockups.length} mockups and downloaded as ZIP!`);
+      } else {
+        // Download individual files
+        mockups.forEach((mockup) => {
+          const url = URL.createObjectURL(mockup.blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = mockup.filename;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        });
+        
+        toast.success(`Generated ${mockups.length} mockups successfully!`);
+      }
     } catch (error) {
       toast.error("Error generating mockups");
       console.error(error);
@@ -450,6 +497,8 @@ export const MockupCreator = () => {
                     currentPosition={stickerPositions[activeTab as keyof typeof stickerPositions]}
                     onStickerPositionChange={(position) => handleStickerPositionChange(activeTab as 'small' | 'medium' | 'large', position)}
                     onPreviewDimensionsChange={(dimensions) => handlePreviewDimensionsChange(activeTab as 'small' | 'medium' | 'large', dimensions)}
+                    onMeasurementLineToggle={setShowMeasurementLine}
+                    onMeasurementSettingsChange={setMeasurementSettings}
                     measurementSettings={{
                       showMeasurementLine,
                       ...measurementSettings
@@ -473,177 +522,86 @@ export const MockupCreator = () => {
             />
           </div>
         </div>
+        
+        {/* Download Options and Generate Button */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg border">
+            <div className="flex items-center gap-3">
+              <Archive className="h-5 w-5 text-muted-foreground" />
+              <div>
+                <p className="text-sm font-medium">Download Options</p>
+                <p className="text-xs text-muted-foreground">
+                  Choose how to download your mockups
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="downloadAsZip"
+                checked={downloadAsZip}
+                onChange={(e) => setDownloadAsZip(e.target.checked)}
+                className="w-4 h-4"
+              />
+              <label htmlFor="downloadAsZip" className="text-sm text-muted-foreground">
+                Download as ZIP
+              </label>
+            </div>
+          </div>
+          
+          <Button
+            variant="generate"
+            size="lg"
+            className="w-full"
+            onClick={generateMockups}
+            disabled={totalMockups === 0 || isGenerating}
+          >
+            {downloadAsZip ? <Archive className="h-4 w-4" /> : <Download className="h-4 w-4" />}
+            {isGenerating ? 'Generating...' : downloadAsZip ? 'Generate & Download ZIP' : 'Generate Mockups'}
+          </Button>
+        </div>
 
-        {/* Generate Panel - Centered below */}
-        <div className="max-w-md mx-auto bg-card p-6 rounded-lg border shadow-elegant">
-          <div className="space-y-6">
-            <h2 className="text-xl font-semibold text-foreground text-center">Generate Mockups</h2>
-            
-            {/* Measurement Line Settings */}
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="measurement-line" className="text-sm font-medium">
-                  Show Measurement Line
-                </Label>
-                <Switch
-                  id="measurement-line"
-                  checked={showMeasurementLine}
-                  onCheckedChange={setShowMeasurementLine}
-                />
+        {/* Loading Screen */}
+        {isGenerating && (
+          <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center">
+            <div className="bg-card p-8 rounded-lg border shadow-lg max-w-md w-full mx-4">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-lg font-semibold">Generating Mockups</h3>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCancelGeneration(true)}
+                  className="h-8 px-3"
+                >
+                  Cancel
+                </Button>
               </div>
               
-              {showMeasurementLine && (
-                <div className="space-y-4 pl-4 border-l-2 border-border">
-                  <div className="space-y-2">
-                    <Label className="text-xs text-muted-foreground">
-                      Line Width: {measurementSettings.lineWidth}px
-                    </Label>
-                    <Slider
-                      value={[measurementSettings.lineWidth]}
-                      onValueChange={(value) => setMeasurementSettings(prev => ({
-                        ...prev,
-                        lineWidth: value[0]
-                      }))}
-                      min={1}
-                      max={50}
-                      step={1}
-                      className="w-full"
-                    />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label className="text-xs text-muted-foreground">
-                      Font Size: {measurementSettings.fontSize}px
-                    </Label>
-                    <Slider
-                      value={[measurementSettings.fontSize]}
-                      onValueChange={(value) => setMeasurementSettings(prev => ({
-                        ...prev,
-                        fontSize: value[0]
-                      }))}
-                      min={12}
-                      max={200}
-                      step={1}
-                      className="w-full"
-                    />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label className="text-xs text-muted-foreground">
-                      Distance: {measurementSettings.distance}px
-                    </Label>
-                    <Slider
-                      value={[measurementSettings.distance]}
-                      onValueChange={(value) => setMeasurementSettings(prev => ({
-                        ...prev,
-                        distance: value[0]
-                      }))}
-                      min={20}
-                      max={200}
-                      step={1}
-                      className="w-full"
-                    />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label className="text-xs text-muted-foreground">
-                      Line Length: {measurementSettings.lineLength}%
-                    </Label>
-                    <Slider
-                      value={[measurementSettings.lineLength]}
-                      onValueChange={(value) => setMeasurementSettings(prev => ({
-                        ...prev,
-                        lineLength: value[0]
-                      }))}
-                      min={50}
-                      max={150}
-                      step={5}
-                      className="w-full"
-                    />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="end-style" className="text-xs text-muted-foreground">
-                      End Style
-                    </Label>
-                    <Select
-                      value={measurementSettings.endStyle}
-                      onValueChange={(value: 'perpendicular' | 'arrow') => setMeasurementSettings(prev => ({
-                        ...prev,
-                        endStyle: value
-                      }))}
-                    >
-                      <SelectTrigger className="h-8">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="perpendicular">Perpendicular Line</SelectItem>
-                        <SelectItem value="arrow">Arrow Head</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="color" className="text-xs text-muted-foreground">
-                      Color
-                    </Label>
-                    <Select
-                      value={measurementSettings.color}
-                      onValueChange={(value) => setMeasurementSettings(prev => ({
-                        ...prev,
-                        color: value
-                      }))}
-                    >
-                      <SelectTrigger className="h-8">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="#FFFFFF">White</SelectItem>
-                        <SelectItem value="#000000">Black</SelectItem>
-                        <SelectItem value="#FF0000">Red</SelectItem>
-                        <SelectItem value="#00FF00">Green</SelectItem>
-                        <SelectItem value="#0000FF">Blue</SelectItem>
-                        <SelectItem value="#FFFF00">Yellow</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+              <div className="space-y-4">
+                <div className="flex justify-between text-sm text-muted-foreground">
+                  <span>Progress</span>
+                  <span>{generationProgress.current} / {generationProgress.total}</span>
                 </div>
-              )}
+                
+                <div className="w-full bg-muted rounded-full h-2">
+                  <div 
+                    className="bg-primary h-2 rounded-full transition-all duration-300"
+                    style={{ 
+                      width: `${generationProgress.total > 0 ? (generationProgress.current / generationProgress.total) * 100 : 0}%` 
+                    }}
+                  />
+                </div>
+                
+                <p className="text-sm text-muted-foreground text-center">
+                  {generationProgress.current === generationProgress.total 
+                    ? 'Finalizing...' 
+                    : `Generating mockup ${generationProgress.current} of ${generationProgress.total}`
+                  }
+                </p>
+              </div>
             </div>
-            
-            <div className="space-y-3">
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Backgrounds:</span>
-                <span className="font-medium">{Object.values(backgrounds).filter(Boolean).length}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Stickers:</span>
-                <span className="font-medium">{stickers.length}</span>
-              </div>
-              <div className="flex justify-between text-sm border-t border-border pt-2">
-                <span className="text-muted-foreground">Total mockups:</span>
-                <span className="font-bold text-accent">{totalMockups}</span>
-              </div>
-            </div>
-
-            <Button
-              variant="generate"
-              size="lg"
-              className="w-full"
-              onClick={generateMockups}
-              disabled={totalMockups === 0 || isGenerating}
-            >
-              <Download className="h-4 w-4" />
-              {isGenerating ? 'Generating...' : 'Generate Mockups'}
-            </Button>
-            
-            {totalMockups === 0 && (
-              <p className="text-xs text-muted-foreground text-center">
-                Upload backgrounds and stickers to get started
-              </p>
-            )}
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

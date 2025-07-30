@@ -31,7 +31,7 @@ export const StickerPanel = ({ stickers, onStickerAdd, onStickerRemove }: Sticke
           <p className="text-sm text-muted-foreground">
             Uploaded stickers ({stickers.length})
           </p>
-          <div className="grid grid-cols-3 gap-3 max-h-80 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100 hover:scrollbar-thumb-gray-400 pr-2">
+          <div className="grid grid-cols-3 gap-3 max-h-80 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100 hover:scrollbar-thumb-gray-400 pr-2 pt-2">
             {stickers.map((sticker, index) => (
               <div key={index} className="relative group">
                 <div className="w-full h-24 bg-muted rounded-lg overflow-hidden border border-border">
