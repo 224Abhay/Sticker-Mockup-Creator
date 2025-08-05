@@ -43,6 +43,7 @@ export const MockupCreator = () => {
   const [generationProgress, setGenerationProgress] = useState({ current: 0, total: 0 });
   const [cancelGeneration, setCancelGeneration] = useState(false);
   const [downloadAsZip, setDownloadAsZip] = useState(false);
+  const [includeSquareMockup, setIncludeSquareMockup] = useState(true);
   
   // Measurement line settings - now using relative values
   const [showMeasurementLine, setShowMeasurementLine] = useState(true);
@@ -155,11 +156,102 @@ export const MockupCreator = () => {
     }));
   };
 
+  const generateSquareMockup = async (sticker: StickerFile): Promise<{ blob: Blob; filename: string }> => {
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('Canvas context not available');
+
+    // Set canvas size to 1080x1080
+    canvas.width = 1080;
+    canvas.height = 1080;
+
+    // Fill background with #F2F1EF
+    ctx.fillStyle = '#F2F1EF';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Create sticker image
+    const stickerImg = new Image();
+    stickerImg.src = sticker.preview;
+    
+    await new Promise(resolve => {
+      stickerImg.onload = resolve;
+    });
+
+    // Get the actual content bounds of the sticker (ignoring transparent pixels)
+    const contentBounds = getContentBounds(stickerImg);
+    const contentWidth = contentBounds.right - contentBounds.left;
+    const contentHeight = contentBounds.bottom - contentBounds.top;
+
+    // Calculate sticker size to fit nicely in the center (about 60% of canvas size)
+    const maxStickerSize = Math.min(canvas.width, canvas.height) * 0.6;
+    const stickerAspectRatio = contentWidth / contentHeight;
+    
+    let stickerW, stickerH;
+    if (stickerAspectRatio > 1) {
+      // Sticker is wider than tall
+      stickerW = maxStickerSize;
+      stickerH = maxStickerSize / stickerAspectRatio;
+    } else {
+      // Sticker is taller than wide
+      stickerH = maxStickerSize;
+      stickerW = maxStickerSize * stickerAspectRatio;
+    }
+
+    // Center the sticker
+    const centerX = canvas.width / 2;
+    const centerY = canvas.height / 2;
+    const finalStickerX = centerX - stickerW / 2;
+    const finalStickerY = centerY - stickerH / 2;
+
+    // Create a temporary canvas for the sticker with shadow and outline
+    const tempCanvas = document.createElement('canvas');
+    const tempCtx = tempCanvas.getContext('2d');
+    if (!tempCtx) throw new Error('Temp canvas context not available');
+    
+    // Set temp canvas size to accommodate shadow and outline
+    const padding = 30; // Extra space for shadow and outline
+    tempCanvas.width = stickerW + padding * 2;
+    tempCanvas.height = stickerH + padding * 2;
+    
+    // Draw shadow
+    tempCtx.save();
+    tempCtx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+    tempCtx.shadowBlur = 25;
+    tempCtx.shadowOffsetX = 6;
+    tempCtx.shadowOffsetY = 6;
+    
+    // Draw the sticker with shadow (this will create shadow only around the actual content)
+    const sourceX = contentBounds.left;
+    const sourceY = contentBounds.top;
+    const sourceWidth = contentWidth;
+    const sourceHeight = contentHeight;
+    
+    tempCtx.drawImage(stickerImg, sourceX, sourceY, sourceWidth, sourceHeight, padding, padding, stickerW, stickerH);
+    tempCtx.restore();
+    
+    // Draw the sticker again on top to ensure it's visible
+    tempCtx.drawImage(stickerImg, sourceX, sourceY, sourceWidth, sourceHeight, padding, padding, stickerW, stickerH);
+    
+    // Draw the temp canvas onto the main canvas
+    ctx.drawImage(tempCanvas, finalStickerX - padding, finalStickerY - padding);
+
+    // Convert to blob
+    const blob = await new Promise<Blob>(resolve => {
+      canvas.toBlob(blob => resolve(blob!), 'image/png');
+    });
+    
+    // Create filename
+    const stickerName = sticker.file.name.replace(/\.[^/.]+$/, "").replace(/\s+/g, "-"); // Remove file extension and replace spaces with hyphens
+    const filename = `${stickerName}.png`;
+    
+    return { blob, filename };
+  };
+
   const generateMockups = async () => {
     const backgroundList = Object.values(backgrounds).filter(Boolean);
     
-    if (backgroundList.length === 0) {
-      toast.error("Please upload at least one background");
+    if (backgroundList.length === 0 && !includeSquareMockup) {
+      toast.error("Please upload at least one background or enable square mockup");
       return;
     }
     
@@ -170,7 +262,16 @@ export const MockupCreator = () => {
 
     setIsGenerating(true);
     setCancelGeneration(false);
-    const totalMockups = backgroundList.length * stickers.length;
+    
+    // Calculate total mockups
+    let totalMockups = 0;
+    if (includeSquareMockup) {
+      totalMockups += stickers.length; // One square mockup per sticker
+    }
+    if (backgroundList.length > 0) {
+      totalMockups += backgroundList.length * stickers.length; // Regular mockups
+    }
+    
     setGenerationProgress({ current: 0, total: totalMockups });
     toast.info("Generating mockups...");
 
@@ -182,7 +283,8 @@ export const MockupCreator = () => {
       const mockups: { blob: Blob; filename: string }[] = [];
       let currentProgress = 0;
 
-      for (const background of backgroundList) {
+      // Generate square mockups if enabled
+      if (includeSquareMockup) {
         for (const sticker of stickers) {
           // Check for cancellation
           if (cancelGeneration) {
@@ -192,231 +294,277 @@ export const MockupCreator = () => {
 
           currentProgress++;
           setGenerationProgress({ current: currentProgress, total: totalMockups });
-          // Create background image
-          const bgImg = new Image();
-          bgImg.src = background.preview;
+
+          const squareMockup = await generateSquareMockup(sticker);
           
-          await new Promise(resolve => {
-            bgImg.onload = resolve;
-          });
-
-          // Set canvas size to background size
-          canvas.width = bgImg.width;
-          canvas.height = bgImg.height;
-
-          // Draw background
-          ctx.drawImage(bgImg, 0, 0);
-
-          // Create sticker image
-          const stickerImg = new Image();
-          stickerImg.src = sticker.preview;
-          
-          await new Promise(resolve => {
-            stickerImg.onload = resolve;
-          });
-
-          // Calculate sticker position and size based on preview ratios for each background size
-          const backgroundSize = Object.keys(backgrounds).find(key => backgrounds[key as keyof typeof backgrounds] === background) as 'small' | 'medium' | 'large';
-          const currentStickerPosition = stickerPositions[backgroundSize];
-          const currentPreviewDimensions = previewDimensions[backgroundSize];
-          const stickerX = (currentStickerPosition.x / currentPreviewDimensions.width) * canvas.width;
-          const stickerY = (currentStickerPosition.y / currentPreviewDimensions.height) * canvas.height;
-          const boxW = (currentStickerPosition.width / currentPreviewDimensions.width) * canvas.width;
-          const boxH = (currentStickerPosition.height / currentPreviewDimensions.height) * canvas.height;
-
-          // Get the actual content bounds of the sticker (ignoring transparent pixels)
-          const contentBounds = getContentBounds(stickerImg);
-          
-          // Calculate sticker dimensions to maintain aspect ratio and fit inside the box
-          // Use the actual content bounds instead of the full image dimensions
-          const contentWidth = contentBounds.right - contentBounds.left;
-          const contentHeight = contentBounds.bottom - contentBounds.top;
-          const stickerAspectRatio = contentWidth / contentHeight;
-          const boxAspectRatio = boxW / boxH;
-          
-          let stickerW, stickerH;
-          if (stickerAspectRatio > boxAspectRatio) {
-            // Sticker content is wider than box - fit to width
-            stickerW = boxW;
-            stickerH = boxW / stickerAspectRatio;
+          if (downloadAsZip) {
+            mockups.push(squareMockup);
           } else {
-            // Sticker content is taller than box - fit to height
-            stickerH = boxH;
-            stickerW = boxH * stickerAspectRatio;
+            // Download immediately if not using ZIP
+            const url = URL.createObjectURL(squareMockup.blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = squareMockup.filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
           }
+        }
+      }
 
-          // Center the sticker within the box
-          const centerX = stickerX + boxW / 2;
-          const centerY = stickerY + boxH / 2;
-          const finalStickerX = centerX - stickerW / 2;
-          const finalStickerY = centerY - stickerH / 2;
+      // Generate regular mockups if backgrounds are uploaded
+      if (backgroundList.length > 0) {
+        for (const background of backgroundList) {
+          for (const sticker of stickers) {
+            // Check for cancellation
+            if (cancelGeneration) {
+              toast.info("Generation cancelled");
+              return;
+            }
 
-          // Draw sticker with content bounds offset
-          const sourceX = contentBounds.left;
-          const sourceY = contentBounds.top;
-          const sourceWidth = contentWidth;
-          const sourceHeight = contentHeight;
-          
-          ctx.drawImage(stickerImg, sourceX, sourceY, sourceWidth, sourceHeight, finalStickerX, finalStickerY, stickerW, stickerH);
+            currentProgress++;
+            setGenerationProgress({ current: currentProgress, total: totalMockups });
+            // Create background image
+            const bgImg = new Image();
+            bgImg.src = background.preview;
+            
+            await new Promise(resolve => {
+              bgImg.onload = resolve;
+            });
 
-          // Add measurement line if enabled
-          if (showMeasurementLine) {
-            const sizeText = backgroundSize === 'small' ? '4cm' : backgroundSize === 'medium' ? '6cm' : '10cm';
-            const isWider = stickerW > stickerH;
+            // Set canvas size to background size
+            canvas.width = bgImg.width;
+            canvas.height = bgImg.height;
+
+            // Draw background
+            ctx.drawImage(bgImg, 0, 0);
+
+            // Create sticker image
+            const stickerImg = new Image();
+            stickerImg.src = sticker.preview;
             
-            // Calculate line length based on end style (100% for perpendicular, 95% for arrow)
-            const lineLength = measurementSettings.endStyle === 'arrow' ? 90 : 100;
+            await new Promise(resolve => {
+              stickerImg.onload = resolve;
+            });
+
+            // Calculate sticker position and size based on preview ratios for each background size
+            const backgroundSize = Object.keys(backgrounds).find(key => backgrounds[key as keyof typeof backgrounds] === background) as 'small' | 'medium' | 'large';
+            const currentStickerPosition = stickerPositions[backgroundSize];
+            const currentPreviewDimensions = previewDimensions[backgroundSize];
+            const stickerX = (currentStickerPosition.x / currentPreviewDimensions.width) * canvas.width;
+            const stickerY = (currentStickerPosition.y / currentPreviewDimensions.height) * canvas.height;
+            const boxW = (currentStickerPosition.width / currentPreviewDimensions.width) * canvas.width;
+            const boxH = (currentStickerPosition.height / currentPreviewDimensions.height) * canvas.height;
+
+            // Get the actual content bounds of the sticker (ignoring transparent pixels)
+            const contentBounds = getContentBounds(stickerImg);
             
-            // Calculate absolute values based on sticker size
-            const absoluteLineWidth = Math.max(1, (stickerW * measurementSettings.lineWidth) / 100);
-            const absoluteFontSize = Math.max(8, (stickerH * measurementSettings.fontSize) / 100);
-            const absoluteDistance = (stickerW * measurementSettings.distance) / 100;
-            const absoluteEndSize = Math.max(5, (stickerW * 2) / 100); // 2% of sticker width for end elements
+            // Calculate sticker dimensions to maintain aspect ratio and fit inside the box
+            // Use the actual content bounds instead of the full image dimensions
+            const contentWidth = contentBounds.right - contentBounds.left;
+            const contentHeight = contentBounds.bottom - contentBounds.top;
+            const stickerAspectRatio = contentWidth / contentHeight;
+            const boxAspectRatio = boxW / boxH;
             
-            // Set line styling
-            ctx.strokeStyle = measurementSettings.color;
-            ctx.lineWidth = absoluteLineWidth;
-            ctx.fillStyle = measurementSettings.color;
-            ctx.font = `bold ${absoluteFontSize}px "Open Sans"`;
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-          
-          if (isWider) {
-            // Horizontal line (width is bigger)
-            const lineY = finalStickerY + stickerH + absoluteDistance;
-            const totalLength = stickerW * (lineLength / 100);
-            const lineX1 = finalStickerX + (stickerW - totalLength) / 2;
-            const lineX2 = lineX1 + totalLength;
-            const centerX = (lineX1 + lineX2) / 2;
-            const textWidth = ctx.measureText(sizeText).width;
-            const gapSize = textWidth + (absoluteFontSize * 2); // Scale gap with font size
-            
-            // Draw left end
-            if (measurementSettings.endStyle === 'perpendicular') {
-              ctx.beginPath();
-              ctx.moveTo(lineX1, lineY - absoluteEndSize);
-              ctx.lineTo(lineX1, lineY + absoluteEndSize);
-              ctx.stroke();
+            let stickerW, stickerH;
+            if (stickerAspectRatio > boxAspectRatio) {
+              // Sticker content is wider than box - fit to width
+              stickerW = boxW;
+              stickerH = boxW / stickerAspectRatio;
             } else {
-              // Arrow head
-              ctx.beginPath();
-              ctx.moveTo(lineX1 - absoluteEndSize * 1.25, lineY);
-              ctx.lineTo(lineX1, lineY - absoluteEndSize);
-              ctx.lineTo(lineX1, lineY + absoluteEndSize);
-              ctx.closePath();
-              ctx.fill();
+              // Sticker content is taller than box - fit to height
+              stickerH = boxH;
+              stickerW = boxH * stickerAspectRatio;
             }
+
+            // Center the sticker within the box
+            const centerX = stickerX + boxW / 2;
+            const centerY = stickerY + boxH / 2;
+            const finalStickerX = centerX - stickerW / 2;
+            const finalStickerY = centerY - stickerH / 2;
+
+            // Draw sticker with content bounds offset
+            const sourceX = contentBounds.left;
+            const sourceY = contentBounds.top;
+            const sourceWidth = contentWidth;
+            const sourceHeight = contentHeight;
             
-            // Draw left arrow shaft
-            ctx.beginPath();
-            ctx.moveTo(lineX1, lineY);
-            ctx.lineTo(centerX - gapSize / 2, lineY);
-            ctx.stroke();
+            ctx.drawImage(stickerImg, sourceX, sourceY, sourceWidth, sourceHeight, finalStickerX, finalStickerY, stickerW, stickerH);
+
+            // Add measurement line if enabled
+            if (showMeasurementLine) {
+              const sizeText = backgroundSize === 'small' ? '4cm' : backgroundSize === 'medium' ? '6cm' : '10cm';
+              const isWider = stickerW > stickerH;
+              
+              // Calculate line length based on end style (100% for perpendicular, 95% for arrow)
+              const lineLength = measurementSettings.endStyle === 'arrow' ? 90 : 100;
+              
+              // Calculate absolute values based on sticker size
+              const absoluteLineWidth = Math.max(1, (stickerW * measurementSettings.lineWidth) / 100);
+              // Use the larger dimension (width or height) to calculate font size for consistency
+              const largerDimension = Math.max(stickerW, stickerH);
+              const absoluteFontSize = Math.max(8, (largerDimension * measurementSettings.fontSize) / 100);
+              const absoluteDistance = (stickerW * measurementSettings.distance) / 100;
+              const absoluteEndSize = Math.max(5, (stickerW * 2) / 100); // 2% of sticker width for end elements
+              
+              // Set line styling
+              ctx.strokeStyle = measurementSettings.color;
+              ctx.lineWidth = absoluteLineWidth;
+              ctx.fillStyle = measurementSettings.color;
+              ctx.font = `bold ${absoluteFontSize}px "Open Sans"`;
+              ctx.textAlign = 'center';
+              ctx.textBaseline = 'middle';
             
-            // Draw right end
-            if (measurementSettings.endStyle === 'perpendicular') {
+            if (isWider) {
+              // Horizontal line (width is bigger)
+              const lineY = finalStickerY + stickerH + absoluteDistance;
+              const totalLength = stickerW * (lineLength / 100);
+              const lineX1 = finalStickerX + (stickerW - totalLength) / 2;
+              const lineX2 = lineX1 + totalLength;
+              const centerX = (lineX1 + lineX2) / 2;
+              const textWidth = ctx.measureText(sizeText).width;
+              const gapSize = textWidth + (absoluteFontSize * 2); // Scale gap with font size
+              
+              // Draw left end
+              if (measurementSettings.endStyle === 'perpendicular') {
+                ctx.beginPath();
+                ctx.moveTo(lineX1, lineY - absoluteEndSize);
+                ctx.lineTo(lineX1, lineY + absoluteEndSize);
+                ctx.stroke();
+              } else {
+                // Arrow head
+                ctx.beginPath();
+                ctx.moveTo(lineX1 - absoluteEndSize * 1.25, lineY);
+                ctx.lineTo(lineX1, lineY - absoluteEndSize);
+                ctx.lineTo(lineX1, lineY + absoluteEndSize);
+                ctx.closePath();
+                ctx.fill();
+              }
+              
+              // Draw left arrow shaft
               ctx.beginPath();
-              ctx.moveTo(lineX2, lineY - absoluteEndSize);
-              ctx.lineTo(lineX2, lineY + absoluteEndSize);
+              ctx.moveTo(lineX1, lineY);
+              ctx.lineTo(centerX - gapSize / 2, lineY);
               ctx.stroke();
-            } else {
-              // Arrow head
+              
+              // Draw right end
+              if (measurementSettings.endStyle === 'perpendicular') {
+                ctx.beginPath();
+                ctx.moveTo(lineX2, lineY - absoluteEndSize);
+                ctx.lineTo(lineX2, lineY + absoluteEndSize);
+                ctx.stroke();
+              } else {
+                // Arrow head
+                ctx.beginPath();
+                ctx.moveTo(lineX2 + absoluteEndSize * 1.25, lineY);
+                ctx.lineTo(lineX2, lineY - absoluteEndSize);
+                ctx.lineTo(lineX2, lineY + absoluteEndSize);
+                ctx.closePath();
+                ctx.fill();
+              }
+              
+              // Draw right arrow shaft
               ctx.beginPath();
-              ctx.moveTo(lineX2 + absoluteEndSize * 1.25, lineY);
-              ctx.lineTo(lineX2, lineY - absoluteEndSize);
-              ctx.lineTo(lineX2, lineY + absoluteEndSize);
-              ctx.closePath();
-              ctx.fill();
-            }
-            
-            // Draw right arrow shaft
-            ctx.beginPath();
-            ctx.moveTo(lineX2, lineY);
-            ctx.lineTo(centerX + gapSize / 2, lineY);
-            ctx.stroke();
-            
-            // Draw size text in the gap
-            ctx.fillText(sizeText, centerX, lineY);
-            
-          } else {
-            // Vertical line (height is bigger)
-            const lineX = finalStickerX + stickerW + absoluteDistance;
-            const totalLength = stickerH * (lineLength / 100);
-            const lineY1 = finalStickerY + (stickerH - totalLength) / 2;
-            const lineY2 = lineY1 + totalLength;
-            const centerY = (lineY1 + lineY2) / 2;
-            const textHeight = absoluteFontSize; // Use calculated font size
-            const gapSize = textHeight + (absoluteFontSize * 2); // Scale gap with font size
-            
-            // Draw top end
-            if (measurementSettings.endStyle === 'perpendicular') {
-              ctx.beginPath();
-              ctx.moveTo(lineX - absoluteEndSize, lineY1);
-              ctx.lineTo(lineX + absoluteEndSize, lineY1);
+              ctx.moveTo(lineX2, lineY);
+              ctx.lineTo(centerX + gapSize / 2, lineY);
               ctx.stroke();
+              
+              // Draw size text in the gap
+              ctx.fillText(sizeText, centerX, lineY);
+              
             } else {
-              // Arrow head
+              // Vertical line (height is bigger)
+              const lineX = finalStickerX + stickerW + absoluteDistance;
+              const totalLength = stickerH * (lineLength / 100);
+              const lineY1 = finalStickerY + (stickerH - totalLength) / 2;
+              const lineY2 = lineY1 + totalLength;
+              const centerY = (lineY1 + lineY2) / 2;
+              const textHeight = absoluteFontSize; // Use calculated font size
+              const gapSize = textHeight + (absoluteFontSize * 2); // Scale gap with font size
+              
+              // Draw top end
+              if (measurementSettings.endStyle === 'perpendicular') {
+                ctx.beginPath();
+                ctx.moveTo(lineX - absoluteEndSize, lineY1);
+                ctx.lineTo(lineX + absoluteEndSize, lineY1);
+                ctx.stroke();
+              } else {
+                // Arrow head
+                ctx.beginPath();
+                ctx.moveTo(lineX, lineY1 - absoluteEndSize * 1.25);
+                ctx.lineTo(lineX - absoluteEndSize, lineY1);
+                ctx.lineTo(lineX + absoluteEndSize, lineY1);
+                ctx.closePath();
+                ctx.fill();
+              }
+              
+              // Draw top arrow shaft
               ctx.beginPath();
-              ctx.moveTo(lineX, lineY1 - absoluteEndSize * 1.25);
-              ctx.lineTo(lineX - absoluteEndSize, lineY1);
-              ctx.lineTo(lineX + absoluteEndSize, lineY1);
-              ctx.closePath();
-              ctx.fill();
-            }
-            
-            // Draw top arrow shaft
-            ctx.beginPath();
-            ctx.moveTo(lineX, lineY1);
-            ctx.lineTo(lineX, centerY - gapSize / 2);
-            ctx.stroke();
-            
-            // Draw bottom end
-            if (measurementSettings.endStyle === 'perpendicular') {
-              ctx.beginPath();
-              ctx.moveTo(lineX - absoluteEndSize, lineY2);
-              ctx.lineTo(lineX + absoluteEndSize, lineY2);
+              ctx.moveTo(lineX, lineY1);
+              ctx.lineTo(lineX, centerY - gapSize / 2);
               ctx.stroke();
-            } else {
-              // Arrow head
+              
+              // Draw bottom end
+              if (measurementSettings.endStyle === 'perpendicular') {
+                ctx.beginPath();
+                ctx.moveTo(lineX - absoluteEndSize, lineY2);
+                ctx.lineTo(lineX + absoluteEndSize, lineY2);
+                ctx.stroke();
+              } else {
+                // Arrow head
+                ctx.beginPath();
+                ctx.moveTo(lineX, lineY2 + absoluteEndSize * 1.25);
+                ctx.lineTo(lineX - absoluteEndSize, lineY2);
+                ctx.lineTo(lineX + absoluteEndSize, lineY2);
+                ctx.closePath();
+                ctx.fill();
+              }
+              
+              // Draw bottom arrow shaft
               ctx.beginPath();
-              ctx.moveTo(lineX, lineY2 + absoluteEndSize * 1.25);
-              ctx.lineTo(lineX - absoluteEndSize, lineY2);
-              ctx.lineTo(lineX + absoluteEndSize, lineY2);
-              ctx.closePath();
-              ctx.fill();
+              ctx.moveTo(lineX, lineY2);
+              ctx.lineTo(lineX, centerY + gapSize / 2);
+              ctx.stroke();
+              
+              // Draw size text in the gap (rotated)
+              ctx.save();
+              ctx.translate(lineX, centerY);
+              ctx.rotate(-Math.PI / 2);
+              ctx.fillText(sizeText, 0, 0);
+              ctx.restore();
             }
+            }
+
+            // Convert to blob
+            const blob = await new Promise<Blob>(resolve => {
+              canvas.toBlob(blob => resolve(blob!), 'image/png');
+            });
             
-            // Draw bottom arrow shaft
-            ctx.beginPath();
-            ctx.moveTo(lineX, lineY2);
-            ctx.lineTo(lineX, centerY + gapSize / 2);
-            ctx.stroke();
+            // Create filename with sticker name and background size
+            const stickerName = sticker.file.name.replace(/\.[^/.]+$/, "").replace(/\s+/g, "-"); // Remove file extension and replace spaces with hyphens
+            const sizeSuffix = backgroundSize === 'small' ? 'S-4-cm' : backgroundSize === 'medium' ? 'M-6-cm' : 'L-10-cm';
+            const filename = `${stickerName}-${sizeSuffix}.png`;
             
-            // Draw size text in the gap (rotated)
-            ctx.save();
-            ctx.translate(lineX, centerY);
-            ctx.rotate(-Math.PI / 2);
-            ctx.fillText(sizeText, 0, 0);
-            ctx.restore();
+            if (downloadAsZip) {
+              mockups.push({ blob, filename });
+            } else {
+              // Download immediately if not using ZIP
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = filename;
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+              URL.revokeObjectURL(url);
+            }
           }
-          }
-
-          // Convert to blob
-          const blob = await new Promise<Blob>(resolve => {
-            canvas.toBlob(blob => resolve(blob!), 'image/png');
-          });
-          
-          // Create filename with sticker name, background name, and background size
-          const stickerName = sticker.file.name.replace(/\.[^/.]+$/, ""); // Remove file extension
-          const backgroundName = background.file.name.replace(/\.[^/.]+$/, ""); // Remove file extension
-          const filename = `${stickerName}-${backgroundName}-${backgroundSize}.png`;
-          
-          mockups.push({ blob, filename });
         }
       }
 
       // Download mockups
-      if (downloadAsZip) {
+      if (downloadAsZip && mockups.length > 0) {
         // Create zip file
         const zip = new JSZip();
         
@@ -437,20 +585,9 @@ export const MockupCreator = () => {
         URL.revokeObjectURL(url);
         
         toast.success(`Generated ${mockups.length} mockups and downloaded as ZIP!`);
-      } else {
-        // Download individual files
-        mockups.forEach((mockup) => {
-          const url = URL.createObjectURL(mockup.blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = mockup.filename;
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-          URL.revokeObjectURL(url);
-        });
-        
-        toast.success(`Generated ${mockups.length} mockups successfully!`);
+      } else if (!downloadAsZip) {
+        // Individual files were downloaded immediately
+        toast.success(`Generated and downloaded ${totalMockups} mockups successfully!`);
       }
     } catch (error) {
       toast.error("Error generating mockups");
@@ -460,7 +597,7 @@ export const MockupCreator = () => {
     }
   };
 
-  const totalMockups = Object.values(backgrounds).filter(Boolean).length * stickers.length;
+  const totalMockups = (includeSquareMockup ? stickers.length : 0) + (Object.values(backgrounds).filter(Boolean).length * stickers.length);
 
   return (
     <div className="min-h-screen bg-background p-6">
@@ -535,17 +672,31 @@ export const MockupCreator = () => {
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                id="downloadAsZip"
-                checked={downloadAsZip}
-                onChange={(e) => setDownloadAsZip(e.target.checked)}
-                className="w-4 h-4"
-              />
-              <label htmlFor="downloadAsZip" className="text-sm text-muted-foreground">
-                Download as ZIP
-              </label>
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="includeSquareMockup"
+                  checked={includeSquareMockup}
+                  onChange={(e) => setIncludeSquareMockup(e.target.checked)}
+                  className="w-4 h-4"
+                />
+                <label htmlFor="includeSquareMockup" className="text-sm text-muted-foreground">
+                  Include 1080x1080 Square Mockup
+                </label>
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="downloadAsZip"
+                  checked={downloadAsZip}
+                  onChange={(e) => setDownloadAsZip(e.target.checked)}
+                  className="w-4 h-4"
+                />
+                <label htmlFor="downloadAsZip" className="text-sm text-muted-foreground">
+                  Download as ZIP
+                </label>
+              </div>
             </div>
           </div>
           

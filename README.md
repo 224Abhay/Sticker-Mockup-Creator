@@ -212,4 +212,4 @@ If you have any questions or need help, please:
 
 ---
 
-**for creators who need professional sticker mockups**
+**for creators who need professional sticker mockups*
