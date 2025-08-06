@@ -54,8 +54,8 @@ export const MockupCreator = () => {
     color: string;
     endStyle: 'perpendicular' | 'arrow';
   }>({
-    lineWidth: 2, // 2% of sticker width
-    fontSize: 8, // 8% of sticker height
+    lineWidth: 1, // 1% of sticker width
+    fontSize: 10, // 10% of sticker height
     distance: 10, // 10% of sticker width
     color: '#FFFFFF',
     endStyle: 'perpendicular'
