@@ -1,8 +1,7 @@
-import { useState } from "react";
-import { X } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import { Button } from "./ui/button";
 import { FileUpload } from "./FileUpload";
+import { TemplateSelector } from "./TemplateSelector";
 
 interface BackgroundFile {
   file: File;
@@ -16,6 +15,12 @@ interface BackgroundPanelProps {
     large?: BackgroundFile;
   };
   onBackgroundChange: (size: 'small' | 'medium' | 'large', file: File | null) => void;
+  onBackgroundSelect: (background: {
+    name: string;
+    url: string;
+    coords: [number, number];
+    length: number;
+  }) => void;
   activeTab: string;
   onTabChange: (tab: string) => void;
 }
@@ -23,6 +28,7 @@ interface BackgroundPanelProps {
 export const BackgroundPanel = ({ 
   backgrounds, 
   onBackgroundChange, 
+  onBackgroundSelect,
   activeTab, 
   onTabChange 
 }: BackgroundPanelProps) => {
@@ -36,7 +42,11 @@ export const BackgroundPanel = ({
 
   return (
     <div className="space-y-4">
-      <h2 className="text-xl font-semibold text-foreground">Backgrounds</h2>
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-semibold text-foreground">Backgrounds</h2>
+        <TemplateSelector onBackgroundSelect={onBackgroundSelect} />
+      </div>
+      
       <Tabs value={activeTab} onValueChange={onTabChange}>
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="small">Small</TabsTrigger>
@@ -45,18 +55,7 @@ export const BackgroundPanel = ({
         </TabsList>
         
         <TabsContent value="small" className="mt-4">
-          {backgrounds.small ? (
-            <div className="flex items-center justify-between p-3 bg-muted rounded-lg border-2 border-border">
-              <span className="text-sm text-muted-foreground">Small background uploaded</span>
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={() => handleRemove('small')}
-              >
-                Remove
-              </Button>
-            </div>
-          ) : (
+          {!backgrounds.small && (
             <FileUpload
               onFileSelect={(files) => handleFileSelect('small', files[0])}
               accept="image/*"
@@ -67,18 +66,7 @@ export const BackgroundPanel = ({
         </TabsContent>
         
         <TabsContent value="medium" className="mt-4">
-          {backgrounds.medium ? (
-            <div className="flex items-center justify-between p-3 bg-muted rounded-lg border-2 border-border">
-              <span className="text-sm text-muted-foreground">Medium background uploaded</span>
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={() => handleRemove('medium')}
-              >
-                Remove
-              </Button>
-            </div>
-          ) : (
+          {!backgrounds.medium && (
             <FileUpload
               onFileSelect={(files) => handleFileSelect('medium', files[0])}
               accept="image/*"
@@ -89,18 +77,7 @@ export const BackgroundPanel = ({
         </TabsContent>
         
         <TabsContent value="large" className="mt-4">
-          {backgrounds.large ? (
-            <div className="flex items-center justify-between p-3 bg-muted rounded-lg border-2 border-border">
-              <span className="text-sm text-muted-foreground">Large background uploaded</span>
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={() => handleRemove('large')}
-              >
-                Remove
-              </Button>
-            </div>
-          ) : (
+          {!backgrounds.large && (
             <FileUpload
               onFileSelect={(files) => handleFileSelect('large', files[0])}
               accept="image/*"

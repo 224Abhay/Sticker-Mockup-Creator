@@ -1,8 +1,4 @@
 import { useState, useRef, useCallback, useEffect } from "react";
-import { Label } from "@/components/ui/label";
-import { Slider } from "@/components/ui/slider";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 
 interface BackgroundFile {
   file: File;
@@ -22,6 +18,7 @@ interface PreviewPanelProps {
     color: string;
     endStyle: 'perpendicular' | 'arrow';
   }) => void;
+  onBackgroundRemove?: () => void;
   measurementSettings?: {
     showMeasurementLine: boolean;
     lineWidth: number;
@@ -32,7 +29,7 @@ interface PreviewPanelProps {
   };
 }
 
-export const PreviewPanel = ({ currentBackground, currentPosition, onStickerPositionChange, onPreviewDimensionsChange, onMeasurementLineToggle, onMeasurementSettingsChange, measurementSettings }: PreviewPanelProps) => {
+export const PreviewPanel = ({ currentBackground, currentPosition, onStickerPositionChange, onPreviewDimensionsChange, onMeasurementLineToggle, onMeasurementSettingsChange, onBackgroundRemove, measurementSettings }: PreviewPanelProps) => {
   const [stickerBox, setStickerBox] = useState(currentPosition);
   const [isDragging, setIsDragging] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
@@ -64,9 +61,9 @@ export const PreviewPanel = ({ currentBackground, currentPosition, onStickerPosi
   const handleMouseDown = (e: React.MouseEvent, action: 'drag' | 'resize') => {
     e.preventDefault();
     if (!previewRef.current) return;
-    
+
     const rect = previewRef.current.getBoundingClientRect();
-    
+
     if (action === 'drag') {
       setIsDragging(true);
       setDragStart({
@@ -81,9 +78,9 @@ export const PreviewPanel = ({ currentBackground, currentPosition, onStickerPosi
 
   const handleMouseMove = (e: React.MouseEvent) => {
     if (!previewRef.current) return;
-    
+
     const rect = previewRef.current.getBoundingClientRect();
-    
+
     if (isDragging) {
       const newX = Math.max(0, Math.min(rect.width - stickerBox.width, e.clientX - rect.left - dragStart.x));
       const newY = Math.max(0, Math.min(rect.height - stickerBox.height, e.clientY - rect.top - dragStart.y));
@@ -109,7 +106,7 @@ export const PreviewPanel = ({ currentBackground, currentPosition, onStickerPosi
 
   return (
     <div className="space-y-4">
-      <div 
+      <div
         ref={previewRef}
         className="relative w-full h-full bg-muted rounded-lg overflow-hidden border-2 border-border"
         onMouseMove={handleMouseMove}
@@ -117,17 +114,30 @@ export const PreviewPanel = ({ currentBackground, currentPosition, onStickerPosi
         onMouseLeave={handleMouseUp}
       >
         {currentBackground ? (
-          <img 
-            src={currentBackground.preview} 
-            alt="Background preview"
-            className="w-full h-full object-contain"
-          />
+          <>
+            <img
+              src={currentBackground.preview}
+              alt="Background preview"
+              className="w-full h-full object-contain"
+            />
+            <button
+              onClick={onBackgroundRemove}
+              className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-400 focus:ring-offset-2"
+              aria-label="Remove background"
+              title="Remove background"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+
+          </>
         ) : (
           <div className="w-full h-full flex items-center justify-center text-muted-foreground">
             Select a background to preview
           </div>
         )}
-        
+
         {/* Sticker position box */}
         <div
           className="absolute border-2 border-primary bg-primary/20 cursor-move"
@@ -159,14 +169,14 @@ export const PreviewPanel = ({ currentBackground, currentPosition, onStickerPosi
               const isWider = stickerBox.width > stickerBox.height;
               // Calculate line length based on end style (100% for perpendicular, 95% for arrow)
               const lineLength = (measurementSettings.endStyle === 'arrow' ? 90 : 100) / 100;
-              
+
               // Calculate absolute values based on sticker box size in preview
               // This matches the same calculation used in the final mockup generation
               const absoluteLineWidth = Math.max(1, (stickerBox.width * measurementSettings.lineWidth) / 100);
               const absoluteFontSize = Math.max(8, (stickerBox.height * measurementSettings.fontSize) / 100);
               const absoluteDistance = (stickerBox.width * measurementSettings.distance) / 100;
               const absoluteEndSize = Math.max(5, (stickerBox.width * 2) / 100); // 2% of sticker width for end elements
-              
+
               if (isWider) {
                 // Horizontal measurement line
                 const lineY = stickerBox.y + stickerBox.height + absoluteDistance;
@@ -176,7 +186,7 @@ export const PreviewPanel = ({ currentBackground, currentPosition, onStickerPosi
                 const centerX = (lineX1 + lineX2) / 2;
                 const textWidth = absoluteFontSize * 0.7; // Approximate text width based on font size
                 const gapSize = textWidth + (absoluteFontSize * 2); // Scale gap with font size
-                
+
                 return (
                   <>
                     {/* Left line segment */}
@@ -188,7 +198,7 @@ export const PreviewPanel = ({ currentBackground, currentPosition, onStickerPosi
                       stroke={measurementSettings.color}
                       strokeWidth={absoluteLineWidth}
                     />
-                    
+
                     {/* Right line segment */}
                     <line
                       x1={centerX + gapSize / 2}
@@ -198,7 +208,7 @@ export const PreviewPanel = ({ currentBackground, currentPosition, onStickerPosi
                       stroke={measurementSettings.color}
                       strokeWidth={absoluteLineWidth}
                     />
-                    
+
                     {/* Left end */}
                     {measurementSettings.endStyle === 'perpendicular' ? (
                       <line
@@ -215,7 +225,7 @@ export const PreviewPanel = ({ currentBackground, currentPosition, onStickerPosi
                         fill={measurementSettings.color}
                       />
                     )}
-                    
+
                     {/* Right end */}
                     {measurementSettings.endStyle === 'perpendicular' ? (
                       <line
@@ -232,7 +242,7 @@ export const PreviewPanel = ({ currentBackground, currentPosition, onStickerPosi
                         fill={measurementSettings.color}
                       />
                     )}
-                    
+
                     {/* Size text */}
                     <text
                       x={centerX}
@@ -257,7 +267,7 @@ export const PreviewPanel = ({ currentBackground, currentPosition, onStickerPosi
                 const centerY = (lineY1 + lineY2) / 2;
                 const textHeight = absoluteFontSize;
                 const gapSize = textHeight + (absoluteFontSize * 2);
-                
+
                 return (
                   <>
                     {/* Top line segment */}
@@ -269,7 +279,7 @@ export const PreviewPanel = ({ currentBackground, currentPosition, onStickerPosi
                       stroke={measurementSettings.color}
                       strokeWidth={absoluteLineWidth}
                     />
-                    
+
                     {/* Bottom line segment */}
                     <line
                       x1={lineX}
@@ -279,7 +289,7 @@ export const PreviewPanel = ({ currentBackground, currentPosition, onStickerPosi
                       stroke={measurementSettings.color}
                       strokeWidth={absoluteLineWidth}
                     />
-                    
+
                     {/* Top end */}
                     {measurementSettings.endStyle === 'perpendicular' ? (
                       <line
@@ -296,7 +306,7 @@ export const PreviewPanel = ({ currentBackground, currentPosition, onStickerPosi
                         fill={measurementSettings.color}
                       />
                     )}
-                    
+
                     {/* Bottom end */}
                     {measurementSettings.endStyle === 'perpendicular' ? (
                       <line
@@ -313,7 +323,7 @@ export const PreviewPanel = ({ currentBackground, currentPosition, onStickerPosi
                         fill={measurementSettings.color}
                       />
                     )}
-                    
+
                     {/* Size text (rotated) */}
                     <text
                       x={lineX}
@@ -335,134 +345,6 @@ export const PreviewPanel = ({ currentBackground, currentPosition, onStickerPosi
           </svg>
         )}
       </div>
-              <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <Label htmlFor="measurement-line" className="text-sm font-medium">
-              Show Measurement Line
-            </Label>
-            <Switch
-              id="measurement-line"
-              checked={measurementSettings?.showMeasurementLine || false}
-              onCheckedChange={(checked) => onMeasurementLineToggle?.(checked)}
-            />
-          </div>
-          
-          {measurementSettings?.showMeasurementLine && (
-            <div className="space-y-4 pl-4 border-l-2 border-border">
-              <div className="space-y-2">
-                <Label className="text-xs text-muted-foreground">
-                  Line Width: {measurementSettings.lineWidth}% of sticker width
-                </Label>
-                <Slider
-                  value={[measurementSettings.lineWidth]}
-                  onValueChange={(value) => onMeasurementSettingsChange?.({
-                    lineWidth: value[0],
-                    fontSize: measurementSettings.fontSize,
-                    distance: measurementSettings.distance,
-                    color: measurementSettings.color,
-                    endStyle: measurementSettings.endStyle
-                  })}
-                  min={0.5}
-                  max={2}
-                  step={0.1}
-                  className="w-full"
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <Label className="text-xs text-muted-foreground">
-                  Font Size: {measurementSettings.fontSize}% of sticker height
-                </Label>
-                <Slider
-                  value={[measurementSettings.fontSize]}
-                  onValueChange={(value) => onMeasurementSettingsChange?.({
-                    lineWidth: measurementSettings.lineWidth,
-                    fontSize: value[0],
-                    distance: measurementSettings.distance,
-                    color: measurementSettings.color,
-                    endStyle: measurementSettings.endStyle
-                  })}
-                  min={2}
-                  max={20}
-                  step={0.5}
-                  className="w-full"
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <Label className="text-xs text-muted-foreground">
-                  Distance: {measurementSettings.distance}% of sticker width
-                </Label>
-                <Slider
-                  value={[measurementSettings.distance]}
-                  onValueChange={(value) => onMeasurementSettingsChange?.({
-                    lineWidth: measurementSettings.lineWidth,
-                    fontSize: measurementSettings.fontSize,
-                    distance: value[0],
-                    color: measurementSettings.color,
-                    endStyle: measurementSettings.endStyle
-                  })}
-                  min={5}
-                  max={30}
-                  step={0.5}
-                  className="w-full"
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="end-style" className="text-xs text-muted-foreground">
-                  End Style
-                </Label>
-                <Select
-                  value={measurementSettings.endStyle}
-                  onValueChange={(value: 'perpendicular' | 'arrow') => onMeasurementSettingsChange?.({
-                    lineWidth: measurementSettings.lineWidth,
-                    fontSize: measurementSettings.fontSize,
-                    distance: measurementSettings.distance,
-                    color: measurementSettings.color,
-                    endStyle: value
-                  })}
-                >
-                  <SelectTrigger className="h-8">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="perpendicular">Perpendicular Line</SelectItem>
-                    <SelectItem value="arrow">Arrow Head</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="color" className="text-xs text-muted-foreground">
-                  Color
-                </Label>
-                <Select
-                  value={measurementSettings.color}
-                  onValueChange={(value) => onMeasurementSettingsChange?.({
-                    lineWidth: measurementSettings.lineWidth,
-                    fontSize: measurementSettings.fontSize,
-                    distance: measurementSettings.distance,
-                    color: value,
-                    endStyle: measurementSettings.endStyle
-                  })}
-                >
-                  <SelectTrigger className="h-8">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="#FFFFFF">White</SelectItem>
-                    <SelectItem value="#000000">Black</SelectItem>
-                    <SelectItem value="#FF0000">Red</SelectItem>
-                    <SelectItem value="#00FF00">Green</SelectItem>
-                    <SelectItem value="#0000FF">Blue</SelectItem>
-                    <SelectItem value="#FFFF00">Yellow</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          )}
-        </div>
     </div>
   );
 };

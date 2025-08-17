@@ -4,18 +4,13 @@ A powerful web application for creating professional sticker mockups with custom
 
 🌐 **[Live Demo](https://224abhay.github.io/Sticker-Mockup-Creator/)** - Try it out now!
 
-![Sticker Mockup Creator](https://img.shields.io/badge/React-18.0-blue?style=for-the-badge&logo=react)
-![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue?style=for-the-badge&logo=typescript)
-![Vite](https://img.shields.io/badge/Vite-5.0-purple?style=for-the-badge&logo=vite)
-![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3.0-38B2AC?style=for-the-badge&logo=tailwind-css)
-![Deploy Status](https://img.shields.io/github/actions/workflow/status/224Abhay/sticker-mockup-creator/deploy.yml?branch=main&label=Deploy&style=for-the-badge)
-
 ## ✨ Features
 
 ### 🖼️ **Multi-Size Background Support**
 - Upload backgrounds for Small (4cm), Medium (6cm), and Large (10cm) sizes
 - Independent positioning for each background size
 - Clean tabbed interface for easy management
+- **Template Selection**: Choose from pre-designed background templates for quick setup
 
 ### 🏷️ **Advanced Sticker Management**
 - Upload multiple stickers simultaneously
@@ -26,10 +21,9 @@ A powerful web application for creating professional sticker mockups with custom
 ### 📏 **Professional Measurement Lines**
 - **Toggle Control**: Enable/disable measurement lines
 - **Customizable Styling**: 
-  - Line width (1-50px)
-  - Font size (12-200px)
-  - Distance from sticker (20-200px)
-  - Line length (50-150% of sticker size)
+  - Line width (0.5-2% of sticker length)
+  - Font size (2-20% of sticker length)
+  - Distance from sticker (5-30% of sticker length)
   - Color selection (White, Black, Red, Green, Blue, Yellow)
   - End styles (Perpendicular lines or Arrow heads)
 - **Live Preview**: See measurement lines in real-time
@@ -42,15 +36,14 @@ A powerful web application for creating professional sticker mockups with custom
 - Content-aware scaling (ignores transparent areas)
 - Maintains aspect ratio automatically
 
-### 📱 **Responsive Design**
-- Works on desktop, tablet, and mobile devices
-- Adaptive layout for different screen sizes
-- Touch-friendly controls
-
-### 💾 **Batch Export**
+### 💾 **Batch Export & Upload**
 - Generate multiple mockups simultaneously
-- Descriptive filenames: `{sticker_name}-{size}.png`
+- **Flexible Naming Conventions**: Customize mockup file naming patterns
 - High-quality PNG output
+- **Multiple Upload Destinations**: 
+  - Direct download to device
+  - Upload to WordPress sites
+  - Upload to cloud storage buckets
 - Automatic download of all generated mockups
 - Zip download option
 
@@ -58,7 +51,6 @@ A powerful web application for creating professional sticker mockups with custom
 - Automatic 1080x1080 square mockups with custom background
 - Professional shadow effects
 - Clean, centered sticker presentation
-- Consistent naming: `{sticker_name}.png`
 
 ## 📸 Example Outputs
 
@@ -147,6 +139,7 @@ If you want to deploy manually:
 ### 1. **Upload Backgrounds**
    - Click on the "Small", "Medium", or "Large" tabs
    - Upload background images for each size
+   - **Use Templates**: Select from pre-designed background templates for quick setup
    - Backgrounds are hidden once uploaded for a clean interface
 
 ### 2. **Add Stickers**
@@ -159,6 +152,7 @@ If you want to deploy manually:
    - Drag the positioning box to place your sticker
    - Resize from the bottom-right corner
    - View real-time position and size coordinates
+   - **Remove Backgrounds**: Use the cross button to remove unwanted backgrounds
 
 ### 4. **Customize Measurement Lines**
    - Toggle measurement lines on/off
@@ -167,41 +161,86 @@ If you want to deploy manually:
    - Select end style (perpendicular lines or arrows)
    - Pick from 6 color options
 
-### 5. **Generate Mockups**
+### 5. **Configure Export Settings**
+   - **Set Naming Conventions**: Customize how your mockup files are named
+   - **Choose Upload Destinations**: Select where to send your generated mockups
+   - Configure measurement line settings for professional output
+
+### 6. **Generate & Upload Mockups**
    - Review the total number of mockups to be generated
    - Click "Generate Mockups" to create all combinations
-   - Files are automatically downloaded with descriptive names
+   - **Multiple Options**:
+     - Download directly to your device
+     - Upload to WordPress sites
+     - Upload to cloud storage buckets
+   - Files are automatically processed with your chosen naming convention
    - Choose between individual downloads or ZIP file download
 
 ## 🎨 Customization
 
 ### Measurement Line Settings
-- **Line Width**: 1-50px range
-- **Font Size**: 12-200px range  
-- **Distance**: 20-200px from sticker
-- **Line Length**: 50-150% of sticker dimensions
+- **Line Width**: 0.5-2% of sticker length
+- **Font Size**: 2-20% of sticker length
+- **Distance**: 5-30% of sticker length
 - **End Style**: Perpendicular lines or Arrow heads
 - **Colors**: White, Black, Red, Green, Blue, Yellow
 
 ### File Naming Convention
-Generated files follow these patterns:
+Generated files follow customizable naming patterns that you can configure:
 
-**Square Mockup:**
-```
-{sticker_name}.png
-```
-Example: `Red-Bull-Racing-Car-Sticker.png`
+**Default Patterns:**
+- **Square Mockup**: `{sticker_name}-sqaure-mockup.png`
+- **Background Mockups**: `{sticker_name}-{size}-mockup.png`
 
-**Background Mockups:**
+**Customizable Options:**
+- **Square Mockup Suffix**: Add custom suffix to square mockups
+- **Size-Specific Suffixes**: Customize suffixes for Small, Medium, and Large mockups
+- **Flexible Formatting**: Control how sticker names and size indicators appear
+
+**Examples with Default Settings:**
 ```
-{sticker_name}-{size_suffix}.png
+Square Mockup: Red-Bull-Racing-Car-Sticker-sqaure-mockup.png
+Small: Red-Bull-Racing-Car-Sticker-Small-mockup.png
+Medium: Red-Bull-Racing-Car-Sticker-Medium-mockup.png
+Large: Red-Bull-Racing-Car-Sticker-Large-mockup.png
 ```
-Examples:
-- Small: `Red-Bull-Racing-Car-Sticker-S-4-cm.png`
-- Medium: `Red-Bull-Racing-Car-Sticker-M-6-cm.png`
-- Large: `Red-Bull-Racing-Car-Sticker-L-10-cm.png`
 
 *Note: Spaces in sticker names are automatically replaced with hyphens*
+
+### Upload Destinations
+Choose where to send your generated mockups:
+
+**Local Download:**
+- Download directly to your device
+- Individual files or ZIP archive
+- Full control over file organization
+
+**WordPress Integration:**
+- Upload directly to WordPress sites
+- Configure site URL, username, and password
+- Automatic media library integration
+- Perfect for content creators and agencies
+
+**Cloud Storage Buckets:**
+- Upload to cloud storage services
+- Support for various bucket providers
+- Scalable storage solutions
+- Ideal for team collaboration and backup
+
+### Template System
+Speed up your workflow with pre-designed backgrounds:
+
+**Quick Setup:**
+- Select from curated background templates
+- Professional designs for different use cases
+- Automatic positioning and sizing
+- Consistent quality across all mockups
+
+**Template Categories:**
+- Business and corporate designs
+- Creative and artistic backgrounds
+- Industry-specific templates
+- Seasonal and themed options
 
 ## 🛠️ Tech Stack
 

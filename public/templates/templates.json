@@ -1,0 +1,14 @@
+{
+  "small-background.png": {
+    "coords": [285, 300],
+    "length": 110
+  },
+  "medium-background.png": {
+    "coords": [260, 410],
+    "length": 175
+  },
+  "large-background.png": {
+    "coords": [220, 190],
+    "length": 200
+  }
+}

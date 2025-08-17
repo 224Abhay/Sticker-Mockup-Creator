@@ -11,9 +11,11 @@ interface StickerPanelProps {
   stickers: StickerFile[];
   onStickerAdd: (files: File[]) => void;
   onStickerRemove: (index: number) => void;
+  onStickerClick?: (sticker: StickerFile) => void;
+  isUploadMode?: boolean;
 }
 
-export const StickerPanel = ({ stickers, onStickerAdd, onStickerRemove }: StickerPanelProps) => {
+export const StickerPanel = ({ stickers, onStickerAdd, onStickerRemove, onStickerClick, isUploadMode }: StickerPanelProps) => {
   return (
     <div className="space-y-4">
       <h2 className="text-xl font-semibold text-foreground">Stickers</h2>
@@ -34,7 +36,12 @@ export const StickerPanel = ({ stickers, onStickerAdd, onStickerRemove }: Sticke
           <div className="grid grid-cols-3 gap-3 max-h-80 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100 hover:scrollbar-thumb-gray-400 pr-2 pt-2">
             {stickers.map((sticker, index) => (
               <div key={index} className="relative group">
-                <div className="w-full h-24 bg-muted rounded-lg overflow-hidden border border-border">
+                <div 
+                  className={`w-full h-24 bg-muted rounded-lg overflow-hidden border border-border ${
+                    isUploadMode && onStickerClick ? 'cursor-pointer hover:border-primary transition-colors' : ''
+                  }`}
+                  onClick={() => isUploadMode && onStickerClick && onStickerClick(sticker)}
+                >
                   <img 
                     src={sticker.preview} 
                     alt={`Sticker ${index + 1}`}
