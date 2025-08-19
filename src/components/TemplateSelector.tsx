@@ -25,43 +25,56 @@ export function TemplateSelector({ onBackgroundSelect }: TemplateSelectorProps) 
 
   const loadBackgroundImages = async () => {
     try {
-      // Load the templates.json file to get coordinates
-      const response = await fetch('/templates/templates.json');
+      // Load templates.json using Vite base path for GitHub Pages compatibility
+      const base = import.meta.env.BASE_URL || '/';
+      const normalizedBase = base.endsWith('/') ? base : base + '/';
+      const templatesJsonUrl = `${normalizedBase}templates/templates.json`;
+
+      let response = await fetch(templatesJsonUrl);
       if (!response.ok) {
-        throw new Error('Failed to load templates.json');
+        // Fallback: try relative path without the base (useful in some hosting setups)
+        response = await fetch('templates/templates.json');
+        if (!response.ok) {
+          throw new Error('Failed to load templates.json');
+        }
       }
-      
+
       const templateData = await response.json();
-      
+
       // Create background image objects with coordinates
       const backgroundImages: BackgroundImage[] = Object.entries(templateData).map(([filename, config]: [string, any]) => ({
-        name: filename.replace('.png', '').replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase()),
-        url: `/templates/${filename}`,
+        name: filename
+          .replace('.png', '')
+          .replace(/-/g, ' ')
+          .replace(/\b\w/g, (l: string) => l.toUpperCase()),
+        url: `${normalizedBase}templates/${filename}`,
         coords: config.coords,
         length: config.length
       }));
-      
+
       setBackgrounds(backgroundImages);
     } catch (error) {
       console.error("Error loading background images:", error);
       
       // Fallback to hardcoded backgrounds if loading fails
+      const base = import.meta.env.BASE_URL || '/';
+      const normalizedBase = base.endsWith('/') ? base : base + '/';
       const fallbackBackgrounds: BackgroundImage[] = [
         {
           name: "Small Background",
-          url: "/templates/small-background.png",
+          url: `${normalizedBase}templates/small-background.png`,
           coords: [12, 12],
           length: 23
         },
         {
           name: "Medium Background", 
-          url: "/templates/medium-background.png",
+          url: `${normalizedBase}templates/medium-background.png`,
           coords: [15, 15],
           length: 30
         },
         {
           name: "Large Background",
-          url: "/templates/large-background.png",
+          url: `${normalizedBase}templates/large-background.png`,
           coords: [20, 20],
           length: 40
         }

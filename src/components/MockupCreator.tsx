@@ -55,10 +55,10 @@ export const MockupCreator = () => {
     }
     return {
       includeSquareMockup: true,
-      squareMockupSuffix: 'square-mockup',
-      smallMockupSuffix: 'small-mockup',
-      mediumMockupSuffix: 'medium-mockup',
-      largeMockupSuffix: 'large-mockup'
+      squareMockupSuffix: '',
+      smallMockupSuffix: '-S-4-cm',
+      mediumMockupSuffix: '-M-6-cm',
+      largeMockupSuffix: '-L-10-cm'
     };
   });
 
@@ -92,10 +92,6 @@ export const MockupCreator = () => {
     }
   }, [uploadDestinations]);
 
-  // Product info modal state
-  const [selectedSticker, setSelectedSticker] = useState<StickerFile | null>(null);
-  const [isProductInfoModalOpen, setIsProductInfoModalOpen] = useState(false);
-  const [stickerProductInfo, setStickerProductInfo] = useState<Record<string, any>>({});
 
   // Settings modal state
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -263,22 +259,6 @@ export const MockupCreator = () => {
     }));
   };
 
-  const handleStickerClick = (sticker: StickerFile) => {
-    if (isUploadMode) {
-      setSelectedSticker(sticker);
-      setIsProductInfoModalOpen(true);
-    }
-  };
-
-  const handleProductInfoSave = (productInfo: any) => {
-    if (selectedSticker) {
-      setStickerProductInfo(prev => ({
-        ...prev,
-        [selectedSticker.file.name]: productInfo
-      }));
-    }
-  };
-
   const generateSquareMockup = async (sticker: StickerFile): Promise<{ blob: Blob; filename: string }> => {
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
@@ -365,7 +345,7 @@ export const MockupCreator = () => {
 
     // Create filename
     const stickerName = sticker.file.name.replace(/\.[^/.]+$/, "").replace(/\s+/g, "-"); // Remove file extension and replace spaces with hyphens
-    const filename = `${stickerName}-${mockupSettings.squareMockupSuffix}.png`;
+    const filename = `${stickerName}${mockupSettings.squareMockupSuffix}.png`;
 
     return { blob, filename };
   };
@@ -593,7 +573,7 @@ export const MockupCreator = () => {
 
       const stickerName = sticker.file.name.replace(/\.[^/.]+$/, "").replace(/\s+/g, "-");
       const sizeSuffix = backgroundSize === 'small' ? mockupSettings.smallMockupSuffix : backgroundSize === 'medium' ? mockupSettings.mediumMockupSuffix : mockupSettings.largeMockupSuffix;
-      const filename = `${stickerName}-${sizeSuffix}.png`;
+      const filename = `${stickerName}${sizeSuffix}.png`;
 
       return { blob, filename };
     } else {
@@ -755,7 +735,7 @@ export const MockupCreator = () => {
           currentProgress++;
 
           const squareMockup = await generateSquareMockup(sticker);
-          const squareFileName = `${sticker.file.name.replace(/\.[^/.]+$/, "")}-${mockupSettings.squareMockupSuffix}.png`;
+          const squareFileName = `${sticker.file.name.replace(/\.[^/.]+$/, "")}${mockupSettings.squareMockupSuffix}.png`;
 
           // Convert to File object for upload
           const squareFile = new File([squareMockup.blob], squareFileName, { type: 'image/png' });
@@ -944,7 +924,6 @@ export const MockupCreator = () => {
               stickers={stickers}
               onStickerAdd={handleStickerAdd}
               onStickerRemove={handleStickerRemove}
-              onStickerClick={handleStickerClick}
               isUploadMode={isUploadMode}
             />
           </div>

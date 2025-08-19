@@ -21,10 +21,6 @@ export interface DownloadSettings {
   downloadAsZip: boolean;
 }
 
-export interface UploadSettings {
-  // No specific upload settings needed - all handled by MockupSettings
-}
-
 export interface UploadDestination {
   id: string;
   name?: string; // Optional since WordPress destinations don't need names
